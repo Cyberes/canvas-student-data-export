@@ -1,7 +1,10 @@
+from pathlib import Path
 from subprocess import run
 
 SINGLEFILE_BINARY_PATH = "./node_modules/single-file/cli/single-file"
-CHROME_PATH = "/usr/bin/chromium-browser"
+
+# TODO: have this be specified by a required arg.
+CHROME_PATH = "/usr/bin/google-chrome"
 
 
 def add_quotes(s):
@@ -10,6 +13,10 @@ def add_quotes(s):
 
 def download_page(url, cookies_path, output_path, output_name_template=""):
     # TODO: we can probably safely exclude pages that match the regex r'/external_tools/retrieve\?'
+
+    if output_name_template and Path(output_path, output_name_template).exists():
+        print('exists')
+        return
 
     args = [
         add_quotes(SINGLEFILE_BINARY_PATH),

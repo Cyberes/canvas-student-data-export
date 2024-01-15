@@ -24,9 +24,19 @@ The tool exports all of the following data for each course:
 - Pages
 - Files
 - Modules
-- Single file webpage of the Canvas page for assignments, announcements, discussions, and modules
+- Single file webpage of the Canvas page for grades, assignments, announcements, discussions, and modules
 
 Additionally, all your files stored on Canvas (such as historic submissions and attachments) will be downloaded.
+
+**TO DO LIST**
+- [x] Export grades.
+- [x] Detect when the cookies and API token are not valid.
+- [ ] Use argparse.
+- [ ] Add an argument to prohibit overwriting existing files.
+- [ ] Have the path to the Chrome binary be specified by a required argument.
+- [ ] Use logging.
+- [ ] Refactor `download_canvas.py`.
+- [ ] Refactor `export.py`.
 
 ## Install
 

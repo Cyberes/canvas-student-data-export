@@ -2,6 +2,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from http.cookiejar import MozillaCookieJar
+from pathlib import Path
 
 import canvasapi
 import requests
@@ -220,3 +221,16 @@ def download_course_module_pages(api_url, course_view, cookies_path):
             for _ in as_completed(futures):
                 bar.update()
             bar.close()
+
+
+def download_course_grades_page(api_url, course_view, cookies_path):
+    if cookies_path == "":
+        return
+
+    dl_dir = Path(DL_LOCATION, course_view.term, course_view.name)
+    dl_dir.mkdir(parents=True, exist_ok=True)
+
+    # TODO: command line arg to prohibit overwrite. Default should overwrite
+    if not (dl_dir / "grades.html").exists():
+        api_target = f'{api_url}/courses/{course_view.course_id}/grades'
+        download_page(api_target, cookies_path, dl_dir, "grades.html")
