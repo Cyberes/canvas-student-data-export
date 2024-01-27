@@ -1,79 +1,80 @@
-import os
+import traceback
 from pathlib import Path
 
-from module.singlefile import download_page
-from module.const import MAX_FOLDER_NAME_SIZE
-from module.download import download_file
-from module.get_canvas import get_extra_assignment_files
+from canvasapi.assignment import Assignment
+from canvasapi.course import Course
+from canvasapi.submission import Submission
+
+from module.api.file import get_embedded_files
+from module.const import global_consts
 from module.helpers import make_valid_filename, shorten_file_name
+from module.items import CanvasModuleItem, jsonify_anything, CanvasModule
+from module.singlefile import download_page
 
 
-def download_module_item(module, item, modules_dir, cookies_path):
-    # If problems arise due to long pathnames, changing module.name to module.id might help, this can also be done with item.title
-    # A change would also have to be made in findCourseModules(course, course_view)
-    module_name = make_valid_filename(str(module.name))
-    module_name = shorten_file_name(module_name, len(module_name) - MAX_FOLDER_NAME_SIZE)
-    items_dir = os.path.join(modules_dir, module_name)
+def download_module_item(course: Course, module: CanvasModule, item: CanvasModuleItem, modules_dir: Path):
+    try:
+        module_name = make_valid_filename(str(module.module.name))
+        module_name = shorten_file_name(module_name, len(module_name) - global_consts.MAX_FOLDER_NAME_SIZE)
+        module_dir = modules_dir / module_name
 
-    if item.url != "":
-        if not os.path.exists(items_dir):
-            os.makedirs(items_dir)
+        if not hasattr(item.item, 'url') or not item.item.url:
+            return
 
-        filename = make_valid_filename(str(item.title)) + ".html"
-        module_item_dir = os.path.join(items_dir, filename)
+        module_dir.mkdir(parents=True, exist_ok=True)
+
+        if item.item.type == "File":
+            file = course.get_file(item.item.content_id)
+            module_file_path = module_dir / make_valid_filename(str(file.display_name))
+            file.download(module_file_path)
+        else:
+            # It's a page, so download the attached files.
+            for file in item.attached_files:
+                file.download(module_dir / file.filename)
 
         # Download the module page.
-        if not os.path.exists(module_item_dir):
-            download_page(item.url, cookies_path, items_dir, filename)
+        html_filename = make_valid_filename(str(item.item.title)) + ".html"
+        download_page(item.item.html_url, module_dir, html_filename)
+    except:
+        # TODO: wrap all threaded funcs in this try/catch
+        traceback.print_exc()
 
 
-def download_assignment(cookies_path, cookie_jar, base_assign_dir, assignment):
-    assignment_title = make_valid_filename(str(assignment.title))
-    assignment_title = shorten_file_name(assignment_title, len(assignment_title) - MAX_FOLDER_NAME_SIZE)
-    assign_dir = os.path.join(base_assign_dir, assignment_title)
+def download_assignment(base_assign_dir: Path, course: Course, assignment: Assignment):
+    try:
+        assignment_title = make_valid_filename(str(assignment.name))
+        assignment_title = shorten_file_name(assignment_title, len(assignment_title) - global_consts.MAX_FOLDER_NAME_SIZE)
+        assign_dir = Path(base_assign_dir, assignment_title)
+        assign_dir.mkdir(parents=True, exist_ok=True)
 
-    if assignment.html_url != "":
-        if not os.path.exists(assign_dir):
-            os.makedirs(assign_dir)
+        if assignment.html_url:
+            download_page(assignment.html_url, assign_dir, "assignment.html")
 
-        assignment_page_path = os.path.join(assign_dir, "assignment.html")
+            # Download attached files.
+            if assignment.description:
+                for file in get_embedded_files(course, assignment.description):
+                    file.download(assign_dir / file.display_name)
 
-        if not os.path.exists(assignment_page_path):
-            download_page(assignment.html_url, cookies_path, assign_dir, "assignment.html")
+        # Students cannot view their past attempts, but this logic is left if that's ever implemented in Canvas.
+        submissions = [assignment.get_submission(global_consts.USER_ID)]
+        for submission in submissions:
+            download_attempt(submission, assign_dir)
+            submission_dir = assign_dir / 'submission' / str(submission.id)
+            for attachment in submission.attachments:
+                filepath = submission_dir / attachment.display_name
+                if not filepath.exists():
+                    attachment.download(filepath)
+    except:
+        traceback.print_exc()
 
-        extra_files = get_extra_assignment_files(assignment.description, cookie_jar)
-        for name, url in extra_files:
-            download_file(url, Path(assign_dir, name), cookie_jar)
 
-    for submission in assignment.submissions:
-        download_submission(assignment, submission, assign_dir, cookies_path)
-
-
-def download_submission(assignment, submission, assign_dir, cookies_path):
-    submission_dir = assign_dir
-
-    if len(assignment.submissions) != 1:
-        submission_dir = os.path.join(assign_dir, str(submission.user_id))
-
-    if submission.preview_url != "":
-        if not os.path.exists(submission_dir):
-            os.makedirs(submission_dir)
-
-        submission_page_dir = os.path.join(submission_dir, "submission.html")
-
-        if not os.path.exists(submission_page_dir):
-            download_page(submission.preview_url, cookies_path, submission_dir, "submission.html")
-
-    if (submission.attempt != 1 and assignment.updated_url != "" and assignment.html_url != ""
-            and assignment.html_url.rstrip("/") != assignment.updated_url.rstrip("/")):
-        submission_dir = os.path.join(assign_dir, "attempts")
-
-        if not os.path.exists(submission_dir):
-            os.makedirs(submission_dir)
-
-        for i in range(submission.attempt):
-            filename = "attempt_" + str(i + 1) + ".html"
-            submission_page_attempt_dir = os.path.join(submission_dir, filename)
-
-            if not os.path.exists(submission_page_attempt_dir):
-                download_page(assignment.updated_url + "/history?version=" + str(i + 1), cookies_path, submission_dir, filename)
+def download_attempt(submission: Submission, assign_dir: Path):
+    try:
+        submission_dir = assign_dir / 'submission' / str(submission.id)
+        submission_dir.mkdir(parents=True, exist_ok=True)
+        for file in submission.attachments:
+            file.download(submission_dir / file.display_name)
+        if submission.preview_url:
+            download_page(submission.preview_url, submission_dir, f'{submission.id}.html')
+    except:
+        traceback.print_exc()

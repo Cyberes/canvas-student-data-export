@@ -12,8 +12,7 @@ def do_download(task):
     task[0].download(task[1])
 
 
-def download_user_files(canvas: canvasapi.Canvas, base_path: str):
-    base_path = Path(base_path)
+def download_user_files(canvas: canvasapi.Canvas, base_path: Path):
     user = canvas.get_current_user()
     folders = []
     for folder in user.get_folders():
