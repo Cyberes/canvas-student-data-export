@@ -119,9 +119,9 @@ class CanvasCourse:
         self.course_code = make_valid_filename(course.course_code if hasattr(course, "course_code") else "")
 
         if hasattr(course, 'original_name'):
-            self.name = course.original_name
+            self.name = make_valid_filename(course.original_name)
         else:
-            self.name = course.name if hasattr(course, "name") else ""
+            self.name = make_valid_filename(course.name) if hasattr(course, "name") else ""
 
         self.course_code = self.course_code.replace('  ', ' ')
         self.name = self.name.replace('  ', ' ')
