@@ -168,8 +168,7 @@ if __name__ == "__main__":
 
         download_course_discussion_pages(resolved_canvas_course)
 
-        # TODO: nothing to test this on
-        # download_course_files(course)
+        download_course_files(course, resolved_canvas_course)
 
         print("Exporting course metadata...")
         export_all_course_data(resolved_canvas_course)
